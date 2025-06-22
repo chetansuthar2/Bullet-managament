@@ -9,23 +9,15 @@ export async function GET(
     const resolvedParams = await params;
     const imageId = resolvedParams.id;
 
-    console.log('=== IMAGE GET REQUEST ===');
-    console.log('Requested image ID:', imageId);
-
     if (!imageId) {
-      console.log('Error: No image ID provided');
       return new NextResponse('Image ID is required', { status: 400 });
     }
 
-    console.log('Attempting to get image from MongoDB...');
     const imageData = await getImageFromMongoDB(imageId);
 
     if (!imageData) {
-      console.log('Error: Image not found in MongoDB for ID:', imageId);
       return new NextResponse('Image not found', { status: 404 });
     }
-
-    console.log('Image found successfully, serving image...');
 
     const { stream, metadata } = imageData;
 
