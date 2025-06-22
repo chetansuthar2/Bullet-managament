@@ -91,21 +91,39 @@ export const getImageFromMongoDB = async (imageId: string): Promise<{
   metadata: any;
 } | null> => {
   try {
+    console.log('=== GET IMAGE FROM MONGODB ===');
+    console.log('Looking for image ID:', imageId);
+
     const bucket = await getGridFSBucket();
     const db = await getDatabase();
-    
+
     // Check if file exists
+    console.log('Checking if file exists in images.files collection...');
     const file = await db.collection('images.files').findOne({
       _id: new ObjectId(imageId)
     });
-    
+
+    console.log('File found:', file ? 'YES' : 'NO');
+    if (file) {
+      console.log('File details:', {
+        id: file._id,
+        filename: file.filename,
+        length: file.length,
+        uploadDate: file.uploadDate,
+        metadata: file.metadata
+      });
+    }
+
     if (!file) {
+      console.log('File not found in database');
       return null;
     }
-    
+
     // Create download stream
+    console.log('Creating download stream...');
     const downloadStream = bucket.openDownloadStream(new ObjectId(imageId));
-    
+
+    console.log('Download stream created successfully');
     return {
       stream: downloadStream,
       metadata: file.metadata

@@ -1161,6 +1161,10 @@ export default function BikeRepairManagement() {
                                       setSelectedEntry(entry);
                                       setShowDetailsDialog(true);
                                     }}
+                                    onError={(e) => {
+                                      // Hide broken images
+                                      e.currentTarget.style.display = 'none';
+                                    }}
                                   />
                                 </div>
                               )}
@@ -1291,6 +1295,10 @@ export default function BikeRepairManagement() {
                                     onClick={() => {
                                       setSelectedEntry(entry);
                                       setShowDetailsDialog(true);
+                                    }}
+                                    onError={(e) => {
+                                      // Hide broken images
+                                      e.currentTarget.style.display = 'none';
                                     }}
                                   />
                                 </div>
@@ -1748,6 +1756,10 @@ export default function BikeRepairManagement() {
                           onClick={() => {
                             // Open image in new tab for full view
                             window.open(selectedEntry.imageUrl, '_blank');
+                          }}
+                          onError={(e) => {
+                            // Hide broken images
+                            e.currentTarget.style.display = 'none';
                           }}
                         />
                         <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-10 transition-all rounded-lg flex items-center justify-center">

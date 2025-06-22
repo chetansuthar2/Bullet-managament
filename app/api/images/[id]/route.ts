@@ -3,27 +3,36 @@ import { getImageFromMongoDB, deleteImageFromMongoDB } from '@/lib/mongoImageSto
 
 export async function GET(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const imageId = params.id;
+    const resolvedParams = await params;
+    const imageId = resolvedParams.id;
+
+    console.log('=== IMAGE GET REQUEST ===');
+    console.log('Requested image ID:', imageId);
 
     if (!imageId) {
+      console.log('Error: No image ID provided');
       return new NextResponse('Image ID is required', { status: 400 });
     }
 
+    console.log('Attempting to get image from MongoDB...');
     const imageData = await getImageFromMongoDB(imageId);
 
     if (!imageData) {
+      console.log('Error: Image not found in MongoDB for ID:', imageId);
       return new NextResponse('Image not found', { status: 404 });
     }
+
+    console.log('Image found successfully, serving image...');
 
     const { stream, metadata } = imageData;
 
     // Convert stream to buffer
     const chunks: Buffer[] = [];
 
-    return new Promise((resolve) => {
+    return new Promise<NextResponse>((resolve) => {
       stream.on('data', (chunk: Buffer) => {
         chunks.push(chunk);
       });
@@ -56,10 +65,11 @@ export async function GET(
 // DELETE - Delete image from MongoDB
 export async function DELETE(
   request: NextRequest,
-  { params }: { params: { id: string } }
+  { params }: { params: Promise<{ id: string }> }
 ) {
   try {
-    const imageId = params.id;
+    const resolvedParams = await params;
+    const imageId = resolvedParams.id;
 
     if (!imageId) {
       return new NextResponse('Image ID is required', { status: 400 });
