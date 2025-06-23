@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { 
-  addRepairEntryToMongoDB, 
-  getRepairEntriesFromMongoDB,
-  updateRepairEntryInMongoDB,
-  deleteRepairEntryFromMongoDB 
-} from '@/lib/mongoStorage';
+import {
+  addRepairEntryToFirebase,
+  getRepairEntriesFromFirebase,
+  updateRepairEntryInFirebase,
+  deleteRepairEntryFromFirebase
+} from '@/lib/firebaseStorage';
 
 // GET - Get all repair entries for a user
 export async function GET(request: NextRequest) {
@@ -16,7 +16,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    const entries = await getRepairEntriesFromMongoDB(userId);
+    const entries = await getRepairEntriesFromFirebase(userId);
     return NextResponse.json(entries);
   } catch (error) {
     console.error('Error getting repair entries:', error);
@@ -35,9 +35,9 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 });
     }
 
-    console.log('Attempting to save to MongoDB...');
-    const entryId = await addRepairEntryToMongoDB(body);
-    console.log('Successfully saved with ID:', entryId);
+    console.log('Attempting to save to Firebase...');
+    const entryId = await addRepairEntryToFirebase(body);
+    console.log('Successfully saved to Firebase with ID:', entryId);
     return NextResponse.json({ id: entryId });
   } catch (error) {
     console.error('Error adding repair entry:', error);
@@ -56,7 +56,7 @@ export async function PUT(request: NextRequest) {
       return NextResponse.json({ error: 'Entry ID required' }, { status: 400 });
     }
 
-    await updateRepairEntryInMongoDB(id, updates);
+    await updateRepairEntryInFirebase(id, updates);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error updating repair entry:', error);
@@ -74,7 +74,7 @@ export async function DELETE(request: NextRequest) {
       return NextResponse.json({ error: 'Entry ID required' }, { status: 400 });
     }
 
-    await deleteRepairEntryFromMongoDB(id);
+    await deleteRepairEntryFromFirebase(id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error('Error deleting repair entry:', error);

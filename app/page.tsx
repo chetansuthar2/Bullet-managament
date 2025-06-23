@@ -31,6 +31,13 @@ import {
   validateImageFile,
 } from "@/lib/clientImageStorage";
 
+// Firebase imports for company details
+import {
+  saveCompanyDetailsToFirebase,
+  getCompanyDetailsFromFirebase,
+  updateCompanyDetailsInFirebase
+} from "@/lib/firebaseStorage";
+
 // Firebase is used only for data storage, not images
 
 // Clerk imports
@@ -51,7 +58,10 @@ interface CompanyDetails {
   owner1Phone: string;
   owner2Name?: string;
   owner2Phone?: string;
-  vehicleType: string;
+  vehicleType?: string; // Made optional since we removed it from setup
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 type RepairEntryUpdate = Partial<RepairEntry> & { parts?: Part[]; finalAmount?: string };
@@ -173,6 +183,7 @@ export default function BikeRepairManagement() {
   // Company details state
   const [companyDetails, setCompanyDetails] = useState<CompanyDetails | null>(null);
   const [hasSetupCompany, setHasSetupCompany] = useState(false);
+  const [loadingCompanyDetails, setLoadingCompanyDetails] = useState(true);
 
   const [advanceCashOption, setAdvanceCashOption] = useState("no");
 
@@ -181,7 +192,8 @@ export default function BikeRepairManagement() {
     customerName: "",
     contactNumber: "",
     address: "",
-    bikeType: "",
+    vehicleCategory: "", // Main vehicle type (car, bike, bullet, etc.)
+    bikeType: "", // Sub-type (petrol, diesel, etc.)
     bikeModel: "",
     numberPlate: "",
     repairType: "",
@@ -192,6 +204,7 @@ export default function BikeRepairManagement() {
   // Image upload states
   const [selectedImage, setSelectedImage] = useState<File | null>(null);
   const [imagePreview, setImagePreview] = useState<string | null>(null);
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: boolean}>({});
   const [uploadingImage, setUploadingImage] = useState(false);
 
   const [deliveryData, setDeliveryData] = useState({
@@ -216,22 +229,52 @@ export default function BikeRepairManagement() {
   const INITIAL_ENTRIES = 3;
   const ADDITIONAL_ENTRIES = 5;
 
-  // Check company setup on load
+  // Check company setup on load from Firebase
   useEffect(() => {
-    if (user) {
-      const storedDetails = localStorage.getItem(`companyDetails_${user.id}`);
-      if (storedDetails && storedDetails.trim() !== "") {
+    const loadCompanyDetails = async () => {
+      if (user) {
         try {
-          setCompanyDetails(JSON.parse(storedDetails));
-          setHasSetupCompany(true);
-        } catch (e) {
-          // If parsing fails, clear the corrupted data
-          localStorage.removeItem(`companyDetails_${user.id}`);
+          console.log('Loading company details from Firebase for user:', user.id);
+          console.log('User created at:', user.createdAt);
+          const details = await getCompanyDetailsFromFirebase(user.id);
+
+          if (details) {
+            console.log('Company details loaded from Firebase:', details);
+            // Convert Firebase details to local interface
+            const localDetails: CompanyDetails = {
+              companyName: details.companyName,
+              address: details.address,
+              owner1Name: details.owner1Name,
+              owner1Phone: details.owner1Phone,
+              owner2Name: details.owner2Name,
+              owner2Phone: details.owner2Phone,
+              vehicleType: details.vehicleType,
+              userId: details.userId,
+              createdAt: details.createdAt,
+              updatedAt: details.updatedAt
+            };
+            setCompanyDetails(localDetails);
+            setHasSetupCompany(true);
+          } else {
+            console.log('No company details found in Firebase, showing setup');
+            setHasSetupCompany(false);
+          }
+          setLoadingCompanyDetails(false);
+        } catch (error) {
+          console.error('Error loading company details from Firebase:', error);
           setHasSetupCompany(false);
+          setLoadingCompanyDetails(false);
+          toast({
+            title: "Warning",
+            description: "Could not load company details. Please check your connection.",
+            variant: "destructive",
+          });
         }
       }
-    }
-  }, [user]);
+    };
+
+    loadCompanyDetails();
+  }, [user, toast]);
 
   // Redirect to sign-in if not authenticated
   useEffect(() => {
@@ -323,9 +366,11 @@ export default function BikeRepairManagement() {
 
   const handleImageSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
+    console.log('Image selected:', file);
     if (!file) return;
 
     const validation = validateImageFile(file);
+    console.log('Validation result:', validation);
     if (!validation.isValid) {
       toast({
         title: "Invalid Image",
@@ -336,11 +381,14 @@ export default function BikeRepairManagement() {
     }
 
     setSelectedImage(file);
+    console.log('Selected image set:', file.name);
 
     // Create preview
     const reader = new FileReader();
     reader.onload = (e) => {
-      setImagePreview(e.target?.result as string);
+      const result = e.target?.result as string;
+      console.log('Image preview created:', result ? 'Success' : 'Failed');
+      setImagePreview(result);
     };
     reader.readAsDataURL(file);
   };
@@ -348,6 +396,11 @@ export default function BikeRepairManagement() {
   const handleRemoveImage = () => {
     setSelectedImage(null);
     setImagePreview(null);
+    setValidationErrors(prev => {
+      const newErrors = { ...prev };
+      delete newErrors.image;
+      return newErrors;
+    });
     // Also clear the file input
     const fileInput = document.querySelector('input[type="file"]') as HTMLInputElement;
     if (fileInput) {
@@ -362,6 +415,7 @@ export default function BikeRepairManagement() {
       customerName: "",
       contactNumber: "",
       address: "",
+      vehicleCategory: "",
       bikeType: "",
       bikeModel: "",
       numberPlate: "",
@@ -387,13 +441,26 @@ export default function BikeRepairManagement() {
     if (!user) return;
 
     // Check all required fields including image
-    if (!formData.customerName || !formData.contactNumber || !formData.address ||
-        !formData.bikeType || !formData.bikeModel || !formData.numberPlate ||
-        !formData.repairType || !selectedImage) {
+    const errors: {[key: string]: boolean} = {};
+
+    if (!formData.customerName) errors.customerName = true;
+    if (!formData.contactNumber) errors.contactNumber = true;
+    if (!formData.address) errors.address = true;
+    if (!formData.vehicleCategory) errors.vehicleCategory = true;
+    if (!formData.bikeType) errors.bikeType = true;
+    if (!formData.bikeModel) errors.bikeModel = true;
+    if (!formData.numberPlate) errors.numberPlate = true;
+    if (!formData.repairType) errors.repairType = true;
+    if (!selectedImage) errors.image = true;
+
+    setValidationErrors(errors);
+
+    if (Object.keys(errors).length > 0) {
       toast({
-        title: "Error",
-        description: "Please fill all required fields including image upload",
+        title: "⚠️ Validation Error",
+        description: "Please fill all required fields (highlighted in yellow)",
         variant: "destructive",
+        duration: 4000,
       });
       return;
     }
@@ -443,8 +510,9 @@ export default function BikeRepairManagement() {
 
       // Show success toast immediately
       toast({
-        title: "Success",
-        description: "Repair entry added successfully!",
+        title: "✅ Success!",
+        description: "Repair entry saved successfully!",
+        duration: 3000,
       });
 
       // Auto clear form after successful submission
@@ -453,6 +521,7 @@ export default function BikeRepairManagement() {
         customerName: "",
         contactNumber: "",
         address: "",
+        vehicleCategory: "",
         bikeType: "",
         bikeModel: "",
         numberPlate: "",
@@ -687,11 +756,57 @@ export default function BikeRepairManagement() {
     }
   };
 
-  const handleCompanySetupComplete = (details: CompanyDetails) => {
+  // Function to reset company setup (for testing/development)
+  const resetCompanySetup = async () => {
+    if (user && process.env.NODE_ENV === 'development') {
+      try {
+        // Note: In production, you might want to delete from Firebase too
+        setCompanyDetails(null);
+        setHasSetupCompany(false);
+        setLoadingCompanyDetails(false);
+
+        console.log('Company setup reset for testing');
+        toast({
+          title: "Reset Complete",
+          description: "Company setup has been reset for testing",
+        });
+      } catch (error) {
+        console.error('Error resetting company setup:', error);
+      }
+    }
+  };
+
+  const handleCompanySetupComplete = async (details: CompanyDetails) => {
     if (user) {
-      localStorage.setItem(`companyDetails_${user.id}`, JSON.stringify(details));
-      setCompanyDetails(details);
-      setHasSetupCompany(true);
+      try {
+        console.log('Saving company details to Firebase:', details);
+
+        // Add userId to company details
+        const companyData = {
+          ...details,
+          userId: user.id
+        };
+
+        await saveCompanyDetailsToFirebase(companyData);
+        setCompanyDetails(details);
+        setHasSetupCompany(true);
+        setLoadingCompanyDetails(false);
+
+        console.log('Company setup completed successfully, vehicleType:', details.vehicleType);
+
+        toast({
+          title: "Success",
+          description: "Company details saved successfully!",
+        });
+
+      } catch (error) {
+        console.error('Error saving company details:', error);
+        toast({
+          title: "Error",
+          description: "Failed to save company details. Please try again.",
+          variant: "destructive",
+        });
+      }
     }
   };
 
@@ -738,6 +853,20 @@ export default function BikeRepairManagement() {
     return null; // Don't show anything, just redirect
   }
 
+  // Show loading while checking company details
+  if (loadingCompanyDetails) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-400 via-blue-500 to-blue-600 flex items-center justify-center">
+        <div className="bg-white rounded-lg p-8 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <Loader2 className="h-6 w-6 animate-spin text-blue-600" />
+            <p className="text-lg font-medium text-gray-700">Loading your workspace...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Show company setup form if not completed
   if (!hasSetupCompany) {
     return <SetupCompanyDetails onSetupComplete={handleCompanySetupComplete} />;
@@ -752,16 +881,11 @@ export default function BikeRepairManagement() {
           <CardHeader className="pb-4">
             <div className="flex items-center justify-between gap-4">
               <div className="flex items-center gap-3">
-                <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-md">
-                  {getVehicleIcon(companyDetails?.vehicleType || '', "h-6 w-6 sm:h-8 sm:w-8", "text-blue-700")}
-                </div>
                 <div>
                   <h1 className="text-lg sm:text-2xl lg:text-3xl font-bold text-blue-800">
-                    {companyDetails?.vehicleType ?
-                      `${companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1)} Repair Management` :
-                      'Vehicle Repair Management'
-                    }
+                    Smart Vehicle Management
                   </h1>
+
                   <p className="text-xs sm:text-sm text-gray-600">
                     Welcome, {user?.fullName || user?.firstName ||
                       (user?.emailAddresses?.[0]?.emailAddress?.split('@')[0]
@@ -771,7 +895,18 @@ export default function BikeRepairManagement() {
                   </p>
                 </div>
               </div>
-              <div className="flex items-center">
+              <div className="flex items-center space-x-2">
+                {/* Development reset button */}
+                {process.env.NODE_ENV === 'development' && (
+                  <Button
+                    onClick={resetCompanySetup}
+                    variant="outline"
+                    size="sm"
+                    className="text-xs"
+                  >
+                    Reset Setup
+                  </Button>
+                )}
                 <div className="p-3 bg-gradient-to-br from-blue-100 to-blue-200 rounded-xl shadow-md">
                   <UserButton
                     appearance={{
@@ -794,12 +929,9 @@ export default function BikeRepairManagement() {
             <CardContent className="p-4 sm:p-6 text-center">
               <div className="text-2xl sm:text-4xl lg:text-5xl font-bold mb-2">{totalBikes}</div>
               <div className="flex items-center justify-center gap-2 text-blue-100">
-                {getVehicleIcon(companyDetails?.vehicleType || '', "h-5 w-5 sm:h-6 sm:w-6", "text-white drop-shadow-md")}
+                <Car className="h-5 w-5 sm:h-6 sm:w-6 text-white drop-shadow-md" />
                 <span className="text-sm sm:text-lg">
-                  Total {companyDetails?.vehicleType ?
-                    companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1) :
-                    'Vehicle'
-                  }
+                  Total Vehicles
                 </span>
               </div>
             </CardContent>
@@ -821,10 +953,7 @@ export default function BikeRepairManagement() {
               <div className="flex items-center justify-center gap-2 text-blue-100">
                 <CheckCircle className="h-4 w-4 sm:h-5 sm:w-5" />
                 <span className="text-sm sm:text-lg">
-                  Delivered {companyDetails?.vehicleType ?
-                    companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1) :
-                    'Vehicle'
-                  }
+                  Delivered Vehicles
                 </span>
               </div>
             </CardContent>
@@ -864,7 +993,17 @@ export default function BikeRepairManagement() {
                   id="customerName"
                   placeholder="Enter customer name"
                   value={formData.customerName}
-                  onChange={(e) => handleInputChange("customerName", e.target.value)}
+                  onChange={(e) => {
+                    handleInputChange("customerName", e.target.value);
+                    if (validationErrors.customerName) {
+                      setValidationErrors(prev => {
+                        const newErrors = { ...prev };
+                        delete newErrors.customerName;
+                        return newErrors;
+                      });
+                    }
+                  }}
+                  className={validationErrors.customerName ? "border-yellow-500 border-2" : ""}
                   required
                 />
               </div>
@@ -884,8 +1023,16 @@ export default function BikeRepairManagement() {
                     const value = e.target.value.replace(/[^0-9]/g, '');
                     if (value.length <= 10) { // Limit to 10 digits
                       handleInputChange("contactNumber", value);
+                      if (validationErrors.contactNumber) {
+                        setValidationErrors(prev => {
+                          const newErrors = { ...prev };
+                          delete newErrors.contactNumber;
+                          return newErrors;
+                        });
+                      }
                     }
                   }}
+                  className={validationErrors.contactNumber ? "border-yellow-500 border-2" : ""}
                   maxLength={10}
                   required
                 />
@@ -893,20 +1040,51 @@ export default function BikeRepairManagement() {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              {/* Vehicle Category Selection */}
+              <div className="space-y-2">
+                <Label htmlFor="vehicleCategory" className="flex items-center gap-2">
+                  <Car className="h-4 w-4" />
+                  Vehicle Category *
+                </Label>
+                <Select value={formData.vehicleCategory} onValueChange={(value) => {
+                  handleInputChange("vehicleCategory", value);
+                  // Reset sub-type when category changes
+                  handleInputChange("bikeType", "");
+                }}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select vehicle category" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="car">Car</SelectItem>
+                    <SelectItem value="bike">Bike</SelectItem>
+                    <SelectItem value="bullet">Bullet</SelectItem>
+                    <SelectItem value="auto">Auto</SelectItem>
+                    <SelectItem value="truck">Truck</SelectItem>
+                    <SelectItem value="scooter">Scooter</SelectItem>
+                    <SelectItem value="motorcycle">Motorcycle</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              {/* Vehicle Sub-Type */}
               <div className="space-y-2">
                 <Label htmlFor="bikeType" className="flex items-center gap-2">
                   <Settings className="h-4 w-4" />
-                  {companyDetails?.vehicleType ?
-                    `${companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1)} Type *` :
+                  {formData.vehicleCategory ?
+                    `${formData.vehicleCategory.charAt(0).toUpperCase() + formData.vehicleCategory.slice(1)} Type *` :
                     'Vehicle Type *'
                   }
                 </Label>
-                <Select value={formData.bikeType} onValueChange={(value) => handleInputChange("bikeType", value)}>
+                <Select
+                  value={formData.bikeType}
+                  onValueChange={(value) => handleInputChange("bikeType", value)}
+                  disabled={!formData.vehicleCategory}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder={`Select ${companyDetails?.vehicleType || 'vehicle'} type`} />
+                    <SelectValue placeholder={formData.vehicleCategory ? `Select ${formData.vehicleCategory} type` : 'Select category first'} />
                   </SelectTrigger>
                   <SelectContent>
-                    {getVehicleTypeOptions(companyDetails?.vehicleType || '').map((option) => (
+                    {formData.vehicleCategory && getVehicleTypeOptions(formData.vehicleCategory).map((option) => (
                       <SelectItem key={option.value} value={option.value}>
                         {option.label}
                       </SelectItem>
@@ -915,23 +1093,26 @@ export default function BikeRepairManagement() {
                 </Select>
               </div>
 
+              {/* Vehicle Model */}
               <div className="space-y-2">
                 <Label htmlFor="bulletModel" className="flex items-center gap-2">
-                  {getVehicleIcon(companyDetails?.vehicleType || '', "h-4 w-4", "text-gray-600")}
-                  {companyDetails?.vehicleType ?
-                    `${companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1)} Model *` :
+                  {getVehicleIcon(formData.vehicleCategory || '', "h-4 w-4", "text-gray-600")}
+                  {formData.vehicleCategory ?
+                    `${formData.vehicleCategory.charAt(0).toUpperCase() + formData.vehicleCategory.slice(1)} Model *` :
                     'Vehicle Model *'
                   }
                 </Label>
                 <Input
                   id="bulletModel"
-                  placeholder={`Enter ${companyDetails?.vehicleType || 'vehicle'} model`}
+                  placeholder={formData.vehicleCategory ? `Enter ${formData.vehicleCategory} model` : 'Select category first'}
                   value={formData.bikeModel}
                   onChange={(e) => handleInputChange("bikeModel", e.target.value)}
+                  disabled={!formData.vehicleCategory}
                   required
                 />
               </div>
 
+              {/* Number Plate */}
               <div className="space-y-2">
                 <Label htmlFor="numberPlate" className="flex items-center gap-2">
                   <CreditCard className="h-4 w-4" />
@@ -945,23 +1126,8 @@ export default function BikeRepairManagement() {
                   required
                 />
               </div>
-            </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
-              <div className="space-y-2">
-                <Label htmlFor="address" className="flex items-center gap-2">
-                  <MapPin className="h-4 w-4" />
-                  Address *
-                </Label>
-                <Textarea
-                  id="address"
-                  placeholder="Enter customer address"
-                  value={formData.address}
-                  onChange={(e) => handleInputChange("address", e.target.value)}
-                  className="min-h-[100px]"
-                  required
-                />
-              </div>
+              {/* Repair Type */}
               <div className="space-y-2">
                 <Label htmlFor="repairType" className="flex items-center gap-2">
                   <Settings className="h-4 w-4" />
@@ -973,14 +1139,11 @@ export default function BikeRepairManagement() {
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="service">Service</SelectItem>
-                    <SelectItem value="modifier">Modifier</SelectItem>
-                    <SelectItem value="repairing">Repairing</SelectItem>
+                    <SelectItem value="modified">Modified</SelectItem>
+                    <SelectItem value="repair part">Repair Part</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
-
-
-              
 
               {/* ADVANCE CASH SECTION */}
               <div className="space-y-2">
@@ -1034,41 +1197,50 @@ export default function BikeRepairManagement() {
                   />
                 )}
               </div>
+            </div>
 
-              {/* IMAGE UPLOAD SECTION */}
+            {/* Address and Image Upload Row */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="address" className="flex items-center gap-2">
+                  <MapPin className="h-4 w-4" />
+                  Address *
+                </Label>
+                <Input
+                  id="address"
+                  placeholder="Enter customer address"
+                  value={formData.address}
+                  onChange={(e) => handleInputChange("address", e.target.value)}
+                  required
+                />
+              </div>
+
               <div className="space-y-2">
                 <Label className="flex items-center gap-2">
                   <Camera className="h-4 w-4" />
                   Upload Image *
                 </Label>
-                <div className="space-y-3">
-                  <Input
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageSelect}
-                    className="cursor-pointer"
-                    required
-                  />
-                  {imagePreview && (
-                    <div className="relative">
-                      <img
-                        src={imagePreview}
-                        alt="Preview"
-                        className="w-full max-w-xs h-32 object-cover rounded-lg border"
-                      />
-                      <Button
-                        type="button"
-                        variant="destructive"
-                        size="sm"
-                        className="absolute top-2 right-2"
-                        onClick={handleRemoveImage}
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  )}
-                </div>
+                <Input
+                  type="file"
+                  accept="image/*"
+                  onChange={handleImageSelect}
+                  className="cursor-pointer"
+                  required
+                />
+                {imagePreview && (
+                  <div className="mt-2">
+                    <img
+                      src={imagePreview}
+                      alt="Preview"
+                      className="w-16 h-16 object-cover rounded border cursor-pointer"
+                      onClick={() => window.open(imagePreview, '_blank')}
+                    />
+                  </div>
+                )}
               </div>
+
+              {/* Empty div for consistent 3-column layout */}
+              <div className="hidden lg:block"></div>
             </div>
 
 
@@ -1130,10 +1302,7 @@ export default function BikeRepairManagement() {
               <TabsList className="grid w-full grid-cols-2">
                 <TabsTrigger value="pending">Pending Repairs ({sortedPendingEntries.length})</TabsTrigger>
                 <TabsTrigger value="delivered">
-                  Delivered {companyDetails?.vehicleType ?
-                    companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1) :
-                    'Vehicle'
-                  } ({sortedDeliveredEntries.length})
+                  Delivered Vehicles ({sortedDeliveredEntries.length})
                 </TabsTrigger>
               </TabsList>
 
@@ -1185,8 +1354,13 @@ export default function BikeRepairManagement() {
                                 )}
                                 <div className="flex items-center gap-2">
                                   <div className="p-1 bg-blue-100 rounded-md">
-                                    {getVehicleIcon(companyDetails?.vehicleType || '', "h-4 w-4", "text-blue-600")}
+                                    {getVehicleIcon(entry.vehicleCategory || entry.bikeType || '', "h-4 w-4", "text-blue-600")}
                                   </div>
+                                  {entry.vehicleCategory && (
+                                    <span className="font-medium text-blue-700">
+                                      {entry.vehicleCategory.charAt(0).toUpperCase() + entry.vehicleCategory.slice(1)}
+                                    </span>
+                                  )}
                                   {entry.bikeModel} ({entry.bikeType})
                                 </div>
                                 <div className="flex items-center gap-2">
@@ -1323,8 +1497,13 @@ export default function BikeRepairManagement() {
                                 )}
                                 <div className="flex items-center gap-2">
                                   <div className="p-1 bg-green-100 rounded-md">
-                                    {getVehicleIcon(companyDetails?.vehicleType || '', "h-4 w-4", "text-green-600")}
+                                    {getVehicleIcon(entry.vehicleCategory || entry.bikeType || '', "h-4 w-4", "text-green-600")}
                                   </div>
+                                  {entry.vehicleCategory && (
+                                    <span className="font-medium text-green-700">
+                                      {entry.vehicleCategory.charAt(0).toUpperCase() + entry.vehicleCategory.slice(1)}
+                                    </span>
+                                  )}
                                   <span>{entry.bikeModel} ({entry.bikeType})</span>
                                 </div>
                                 <div className="flex items-center gap-2">

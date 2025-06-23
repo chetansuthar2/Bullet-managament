@@ -1,7 +1,30 @@
 import { MongoClient, Db, GridFSBucket } from 'mongodb';
 
-const uri = process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/VehicleRepairDB';
-console.log('MongoDB URI:', uri);
+// Get MongoDB URI based on environment
+const getMongoDBUri = () => {
+  // Check if we're in production/deployment
+  const isProduction = process.env.NODE_ENV === 'production' || process.env.VERCEL || process.env.NETLIFY;
+
+  if (isProduction) {
+    // In production, try to use Atlas URI first, fallback to regular URI
+    const atlasUri = process.env.MONGODB_ATLAS_URI || process.env.MONGODB_URI;
+    if (!atlasUri || atlasUri.includes('127.0.0.1') || atlasUri.includes('localhost')) {
+      console.error('❌ Production deployment detected but no cloud MongoDB URI found!');
+      console.error('Please set MONGODB_ATLAS_URI environment variable with your MongoDB Atlas connection string');
+      console.error('Example: mongodb+srv://<username>:<password>@cluster0.xxxxx.mongodb.net/VehicleRepairDB');
+      throw new Error('Cloud MongoDB URI required for production deployment');
+    }
+    return atlasUri;
+  } else {
+    // In development, use local URI
+    return process.env.MONGODB_URI_LOCAL || process.env.MONGODB_URI || 'mongodb://127.0.0.1:27017/VehicleRepairDB';
+  }
+};
+
+const uri = getMongoDBUri();
+console.log('Environment:', process.env.NODE_ENV || 'development');
+console.log('MongoDB URI:', uri.includes('mongodb+srv') ? 'MongoDB Atlas (Cloud)' : 'Local MongoDB');
+console.log('Database Name: VehicleRepairDB');
 const options = {};
 
 let client: MongoClient;

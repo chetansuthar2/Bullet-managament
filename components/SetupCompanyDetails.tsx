@@ -17,7 +17,6 @@ interface CompanyDetails {
   owner1Phone: string;
   owner2Name?: string;
   owner2Phone?: string;
-  vehicleType: string; // New field for vehicle type
 }
 
 export function SetupCompanyDetails({ onSetupComplete }: { onSetupComplete: (details: CompanyDetails) => void }) {
@@ -29,7 +28,6 @@ export function SetupCompanyDetails({ onSetupComplete }: { onSetupComplete: (det
     owner1Phone: "",
     owner2Name: "",
     owner2Phone: "",
-    vehicleType: "", // Default empty
   });
   const [loading, setLoading] = useState(false);
   const { toast } = useToast();
@@ -42,10 +40,10 @@ export function SetupCompanyDetails({ onSetupComplete }: { onSetupComplete: (det
   };
 
   const handleSubmit = () => {
-    if (!companyDetails.companyName || !companyDetails.address || !companyDetails.owner1Name || !companyDetails.owner1Phone || !companyDetails.vehicleType) {
+    if (!companyDetails.companyName || !companyDetails.address || !companyDetails.owner1Name || !companyDetails.owner1Phone) {
       toast({
         title: "Error",
-        description: "Please fill all required fields including vehicle type",
+        description: "Please fill all required fields",
         variant: "destructive",
       });
       return;
@@ -75,7 +73,7 @@ export function SetupCompanyDetails({ onSetupComplete }: { onSetupComplete: (det
                 ?.join(' ')) || 'User'}!
           </CardTitle>
           <p className="text-center text-lg text-blue-600 font-medium mb-2">
-            {companyDetails.vehicleType ? `${companyDetails.vehicleType.charAt(0).toUpperCase() + companyDetails.vehicleType.slice(1)} Repair Management` : 'Vehicle Repair Management'}
+            Smart Vehicle Management
           </p>
           <p className="text-center text-gray-600">
             Please set up your company details to get started
@@ -94,26 +92,6 @@ export function SetupCompanyDetails({ onSetupComplete }: { onSetupComplete: (det
                 onChange={(e) => handleInputChange("companyName", e.target.value)}
                 required
               />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="vehicleType" className="font-medium">
-                Vehicle Type *
-              </Label>
-              <Select value={companyDetails.vehicleType} onValueChange={(value) => handleInputChange("vehicleType", value)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select vehicle type" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="bullet">Bullet</SelectItem>
-                  <SelectItem value="bike">Bike</SelectItem>
-                  <SelectItem value="car">Car</SelectItem>
-                  <SelectItem value="auto">Auto</SelectItem>
-                  <SelectItem value="truck">Truck</SelectItem>
-                  <SelectItem value="scooter">Scooter</SelectItem>
-                  <SelectItem value="motorcycle">Motorcycle</SelectItem>
-                </SelectContent>
-              </Select>
             </div>
 
             <div className="space-y-2">

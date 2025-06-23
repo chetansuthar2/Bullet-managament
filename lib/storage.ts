@@ -28,6 +28,7 @@ export interface RepairEntry {
   customerName: string
   contactNumber: string
   address: string
+  vehicleCategory?: string // Main vehicle type (car, bike, bullet, etc.)
   bikeType: string
   bikeModel: string;
   numberPlate: string
