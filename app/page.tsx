@@ -250,8 +250,8 @@ export default function BikeRepairManagement() {
               owner2Phone: details.owner2Phone,
               vehicleType: details.vehicleType,
               userId: details.userId,
-              createdAt: details.createdAt,
-              updatedAt: details.updatedAt
+              createdAt: details.createdAt?.toDate?.() ? details.createdAt.toDate().toISOString() : (typeof details.createdAt === 'string' ? details.createdAt : undefined),
+              updatedAt: details.updatedAt?.toDate?.() ? details.updatedAt.toDate().toISOString() : (typeof details.updatedAt === 'string' ? details.updatedAt : undefined)
             };
             setCompanyDetails(localDetails);
             setHasSetupCompany(true);
@@ -784,7 +784,8 @@ export default function BikeRepairManagement() {
         // Add userId to company details
         const companyData = {
           ...details,
-          userId: user.id
+          userId: user.id,
+          vehicleType: details.vehicleType || 'vehicle' // Ensure vehicleType is always provided
         };
 
         await saveCompanyDetailsToFirebase(companyData);

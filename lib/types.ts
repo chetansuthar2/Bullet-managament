@@ -41,4 +41,7 @@ export type CompanyDetails = {
   owner2Name?: string;
   owner2Phone?: string;
   vehicleType: string;
+  userId?: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
