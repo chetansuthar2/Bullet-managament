@@ -303,14 +303,14 @@ DEBUG=true
 - [Tailwind CSS](https://tailwindcss.com/) - CSS framework
 
 ## 📸 Screenshots
-- ![welcome](https://github.com/user-attachments/assets/ea3c93ba-c3dc-48dd-b91d-5079c2410703)
-![View Detail](https://github.com/user-attachments/assets/504a15e1-8cf0-43f1-81f2-f9f821d183cf)
-![Profile](https://github.com/user-attachments/assets/aa4779d6-a39d-436a-b0b7-d037e93eaa61)
-![Pending](https://github.com/user-attachments/assets/36a5a38a-b9f0-49cf-8780-a0d410e6c750)
 ![login](https://github.com/user-attachments/assets/0f93238b-45a7-4f04-af22-9b58999010b0)
-![Developer](https://github.com/user-attachments/assets/9fc18137-45ac-4117-bbaf-2da0edcc26ba)
-![Delivered](https://github.com/user-attachments/assets/0f9d17c4-35d7-4f48-b823-3e43af1db6a7)
+![welcome](https://github.com/user-attachments/assets/ea3c93ba-c3dc-48dd-b91d-5079c2410703)
 ![Dashborad](https://github.com/user-attachments/assets/8e925dfc-9388-41a9-985b-59fc960f8a5a)
+![Profile](https://github.com/user-attachments/assets/aa4779d6-a39d-436a-b0b7-d037e93eaa61)
+![Developer](https://github.com/user-attachments/assets/9fc18137-45ac-4117-bbaf-2da0edcc26ba)
+![Pending](https://github.com/user-attachments/assets/36a5a38a-b9f0-49cf-8780-a0d410e6c750)
+![Delivered](https://github.com/user-attachments/assets/0f9d17c4-35d7-4f48-b823-3e43af1db6a7)
+![View Detail](https://github.com/user-attachments/assets/504a15e1-8cf0-43f1-81f2-f9f821d183cf)
 ![Create Bill](https://github.com/user-attachments/assets/10585c11-50dd-44c4-9e77-57042ab164ae)
 
 
