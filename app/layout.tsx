@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Bullet Repair Management',
+  title: 'Vehicle Repair Management',
   description: 'Professional bullet repair management system',
 }
 
