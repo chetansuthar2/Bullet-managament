@@ -5,7 +5,7 @@ A modern, full-stack web application for managing vehicle repair services with r
 ## 🎯 Live Demo
 
 🌐 **Live Application**:
-  [ https://bullet-managament-ey7z-git-master-chetan-suthars-projects.vercel.app/ ]
+  [https://bullet-managament.vercel.app/]
 
 ## 🌟 Features
 
