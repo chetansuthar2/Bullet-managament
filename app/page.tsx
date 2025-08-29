@@ -123,12 +123,9 @@ const getVehicleTypeOptions = (vehicleType: string) => {
         { value: 'electric', label: 'Electric' }
       ];
     case 'bike':
-    case 'motorcycle':
       return [
         { value: 'petrol', label: 'Petrol' },
         { value: 'electric', label: 'Electric' },
-        { value: 'kick-start', label: 'Kick Start' },
-        { value: 'self-start', label: 'Self Start' }
       ];
     case 'bullet':
       return [
@@ -136,12 +133,11 @@ const getVehicleTypeOptions = (vehicleType: string) => {
         { value: 'classic-350', label: 'Classic 350' },
         { value: 'classic-500', label: 'Classic 500' },
         { value: 'standard-350', label: 'Standard 350' },
-        { value: 'electra', label: 'Electra' }
+        { value: 'diesel', label: 'Diesel' }
       ];
     case 'auto':
       return [
         { value: 'petrol', label: 'Petrol' },
-        { value: 'diesel', label: 'Diesel' },
         { value: 'cng', label: 'CNG' },
         { value: 'electric', label: 'Electric' }
       ];
@@ -151,15 +147,11 @@ const getVehicleTypeOptions = (vehicleType: string) => {
         { value: 'petrol', label: 'Petrol' },
         { value: 'cng', label: 'CNG' },
         { value: 'electric', label: 'Electric' },
-        { value: 'heavy-duty', label: 'Heavy Duty' },
-        { value: 'light-duty', label: 'Light Duty' }
       ];
     case 'scooter':
       return [
         { value: 'petrol', label: 'Petrol' },
         { value: 'electric', label: 'Electric' },
-        { value: 'automatic', label: 'Automatic' },
-        { value: 'gear', label: 'Gear' }
       ];
     default:
       return [
@@ -2202,7 +2194,6 @@ export default function BikeRepairManagement() {
                         <SelectItem value="service">Service</SelectItem>
                         <SelectItem value="modifier">Modifier</SelectItem>
                         <SelectItem value="repairing">Repairing</SelectItem>
-                        <SelectItem value="other">Other</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
